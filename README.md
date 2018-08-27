@@ -1,2 +1,2 @@
 # BiliaryCirrhosis
-survival analysis of biliary cirrohis
+survival analysis of biliary cirrhosis
