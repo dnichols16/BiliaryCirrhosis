@@ -24,10 +24,10 @@ Missing data items are denoted by "." <br>
 
 Primary biliary cirrhosis (now more accurately termed primary biliary cholangitis) is a chronic disease in which the bile ducts in the liver are slowly destroyed. When the bile ducts are damaged, bile can back up in the liver and sometimes lead to irreversible scarring of liver tissue (cirrhosis). Primary biliary cholangitis is considered an autoimmune disease, which means your body's immune system is mistakenly attacking healthy cells and tissue. Researchers think a combination of genetic and environmental factors triggers the disease. It usually develops slowly. Medication can slow liver damage, especially if treatment begins early. <br>
 
-We will treat this data as a survival analysis problem. In addition to looking at the treatment's efficacy, we can look at the effectiveness of the various physical signs included as covariates which may help to indicate a fatal outcome for this disease. <br>
+We will treat this data as a survival analysis problem. In addition to looking at the treatment's efficacy, we can look at the effectiveness of the various physical signs and laboratory values included as covariates which may help to indicate prognosis for survival outcome. <br>
 
-I have stored the data on Google Sheets. It can be obtained by:
 
+First, load the necessary libraries:
 ```{r, message = FALSE, warning = FALSE}
 set.seed(123)
 library(tidyverse)
@@ -41,16 +41,14 @@ library(broom)
 library(tidyr)
 library(flexsurv)
 library(GGally)
-library(e1071)
-library(rms)
 library(purrr)
 library(stringr)
 library(gridExtra)
 library(vcd)
-library(ggmosaic)
-
 ```
-```{r}
+
+I have stored the data on Google Sheets. It can be obtained by:
+```{r, message = FALSE, warning = FALSE}
 myurl <- "https://docs.google.com/spreadsheets/d/e/2PACX-1vTvuWL7vHEYFv9N0KV1C3ZVXDYhTMOS6n4PCjop8vaeK1IJQFsFTuh4bJYkdoYACZbc1upKeaykwqnK/pub?output=csv"
 
 bcir <- read_csv(url(myurl))
@@ -138,7 +136,7 @@ nums1 <- nums %>% dplyr::select(lbili, lchol, lalkphos, lcu, lsgot,
                          lptt, ltrig, alb, plat, age_yr)
 ```
 
-I will deal with missing data by random imputation, Please see my previous blog posts for an explanation of this method: [Random Imputation]("https://epi2020datascience.blogspot.com/). We will need to obtain the means and standard deviations of the variable that we will impute.
+I will deal with missing data by random imputation, Please see my previous blog posts for an explanation of this method: [Random Imputation - January  2018]("https://epi2020datascience.blogspot.com/) and [Random vs MICE imputation - July 2018](https://epi2020datascience.blogspot.com/). We will need to obtain the means and standard deviations of the variables that we will impute.
 ```{r, message = FALSE, warning = FALSE}
    #Random impute the NA's
    #first confirm that we have NA's
@@ -183,6 +181,8 @@ GGally::ggpairs(nums1,
         color = "blue",
         size = .3)))
 ```
+
+None of the continuous variables are highly correlated. The higher correlations occur among the tests usually positive in chronic liver disease(alkaline phosphatase, copper and bilirubin)
 
 ```{r, message = FALSE, warning = FALSE}
 #plot variables
@@ -326,40 +326,190 @@ getsmd(unmatchedtab1)
 There really isn't much difference between the unmatched and matched groups so it looks as if the reseachers did the best possible job of matching through randomization of treatment. <br>
 
 
-
-```{r, message = FALSE, warning = FALSE}
-#KM Curve
+#####**Kaplan-Meier Curves**
+Efficacy of treatment
+```{r message = FALSE, warning = FALSE, fig.width = 5, fig.height = 4}
+#KM Curve - rx
 m1<- survfit(Surv(time, event) ~ rx, data = bcir1)
-m2<- survfit(Surv(time, event) ~ sex, data = bcir1)
-m3<- survfit(Surv(time, event) ~ stage, data = bcir1)
-m4<- survfit(Surv(time, event) ~ ascites, data = bcir1)
-m5<- survfit(Surv(time, event) ~ hepmeg, data = bcir1)
-m6<- survfit(Surv(time, event) ~ spiders, data = bcir1)
-m7<- survfit(Surv(time, event) ~ edema, data = bcir1)
+survdiff(Surv(time, event) ~ rx, data = bcir1)
 ggsurvplot(m1, data = bcir1,
-           surv.median.line = "hv",
-           conf.int = TRUE) # Add medians survival
-ggsurvplot(m2, data = bcir1,
-           surv.median.line = "hv",
-           conf.int = TRUE) # Add medians survival
-ggsurvplot(m3, data = bcir1,
-           surv.median.line = "hv",
-           conf.int = TRUE) # Add medians survival
-ggsurvplot(m4, data = bcir1,
-           surv.median.line = "hv",
-           conf.int = TRUE) # Add medians survival
-ggsurvplot(m5, data = bcir1,
-           surv.median.line = "hv",
-           conf.int = TRUE) # Add medians survival
-ggsurvplot(m6, data = bcir1,
-           surv.median.line = "hv",
-           conf.int = TRUE) # Add medians survival
-ggsurvplot(m7, data = bcir1,
            surv.median.line = "hv",
            conf.int = TRUE) # Add medians survival
 ```
 
+There is no signicicant difference between the treatment curves. There isn't even a segment of the curves that shows any difference.
 
+Sex
+```{r message = FALSE, warning = FALSE, fig.width = 5, fig.height = 4}
+m2<- survfit(Surv(time, event) ~ sex, data = bcir1)
+survdiff(Surv(time, event) ~ sex, data = bcir1)
+ggsurvplot(m2, data = bcir1,
+           surv.median.line = "hv",
+           conf.int = TRUE) 
+```
+
+There is no significant survival difference between men and women. The confidence intervals overlap along the whole length of the curves.
+
+Stage of Disease
+```{r message = FALSE, warning = FALSE, fig.width = 5, fig.height = 4}
+m3<- survfit(Surv(time, event) ~ stage, data = bcir1)
+survdiff(Surv(time, event) ~ stage, data = bcir1)
+ggsurvplot(m3, data = bcir1,
+           surv.median.line = "hv",
+           conf.int = TRUE)
+
+```
+
+The first three stages show similar, overlapping survival curves. Stage 4 patients showed a significantly worse survival.
+
+Ascites(fluid accumulation in peritoneal cavity)
+```{r message = FALSE, warning = FALSE, fig.width = 5, fig.height = 4}
+m4<- survfit(Surv(time, event) ~ ascites, data = bcir1)
+survdiff(Surv(time, event) ~ ascites, data = bcir1)
+ggsurvplot(m4, data = bcir1,
+           surv.median.line = "hv",
+           conf.int = TRUE)
+```
+
+Those patients with ascites (fluid accumulation in the peritoneal cavity) showed a significantly worse survival. This indicates that the presence or absence of diabetes is a good indicator of survival prognosis.
+
+Hepatomegaly(enlarged liver)
+```{r message = FALSE, warning = FALSE, fig.width = 5, fig.height = 4}
+m5<- survfit(Surv(time, event) ~ hepmeg, data = bcir1)
+survdiff(Surv(time, event) ~ hepmeg, data = bcir1)
+ggsurvplot(m5, data = bcir1,
+           surv.median.line = "hv",
+           conf.int = TRUE) 
+```
+
+Those patients with hepatomegaly (liver enlargement) sohow a significantly worse survival indicating that this physical sign is a good prognosticator of poor survival.
+
+Spiders(skin vascular malformations)
+```{r message = FALSE, warning = FALSE, fig.width = 5, fig.height = 4}
+m6<- survfit(Surv(time, event) ~ spiders, data = bcir1)
+survdiff(Surv(time, event) ~ spiders, data = bcir1)
+ggsurvplot(m6, data = bcir1,
+           surv.median.line = "hv",
+           conf.int = TRUE)
+```
+
+Likewise, spiders (skin vascular structures that have the appearance of spiders are a good predictor of poor survival.
+
+Edema(fluid swelling in the legs)
+```{r message = FALSE, warning = FALSE, fig.width = 5, fig.height = 4}
+m7<- survfit(Surv(time, event) ~ edema, data = bcir1)
+survdiff(Surv(time, event) ~ edema, data = bcir1)
+ggsurvplot(m7, data = bcir1,
+           surv.median.line = "hv",
+           conf.int = TRUE) 
+```
+
+Edema (fluid swelling in the legs) is also a reliable sign of poor survival, shown by the significant difference in survival curves between the groups having and not having spider skin vessels. <br>
+
+
+#####**Evaluation of Laboratory Test Prognostic Value**
+The two functions below will categorize the lab tests at the 50th percentile and look for significant differences in survival between the two groups. These comparisons will indicate the prognostic value of the lab tests in primary biliary cirrhosis.
+```{r, message = FALSE, warning = FALSE}
+#Categorize the numerics for K-M estimator
+   #bili - not the log value
+numcat_km <- function(var) {
+  var_cut <- cut(var,
+                 quantile(var, c( 0.00, 0.50, 1.00),
+                          na.rm = TRUE))
+  bcir1$var_cut <- var_cut
+  m8<- survfit(Surv(time, event) ~ var_cut, data = bcir1)
+  ggsurvplot(m8, data = bcir1,
+             surv.median.line = "hv",
+             conf.int = TRUE)
+}
+```
+
+```{r, message = FALSE, warning = FALSE}
+numcat_diff <- function(var) {
+  var_cut <- cut(var,
+                 quantile(var, c( 0.00, 0.50, 1.00),
+                          na.rm = TRUE))
+  bcir1$var_cut <- var_cut
+  survdiff(Surv(time, event) ~ var_cut, data = bcir1)
+}
+```
+
+```{r message = FALSE, warning = FALSE, fig.width = 5, fig.height = 4, echo = FALSE}
+   #bili
+print("Bilirubin - Good prognostic value")
+numcat_km(nums$bili)
+numcat_diff(nums$bili)
+```
+
+```{r message = FALSE, warning = FALSE, fig.width = 5, fig.height = 4, echo = FALSE}
+   #chol
+print("Cholesterol - Poor prognostic value")
+numcat_km(nums$chol)
+numcat_diff(nums$chol)
+```
+
+```{r message = FALSE, warning = FALSE, fig.width = 5, fig.height = 4, echo = FALSE}
+#alb
+print("Albumin - Good prognostic value")
+numcat_km(nums$alb)
+numcat_diff(nums$alb)
+```
+
+```{r message = FALSE, warning = FALSE, fig.width = 5, fig.height = 4, echo = FALSE}
+#cu
+print("Copper - Good prognostic value")
+numcat_km(nums$cu)
+numcat_diff(nums$cu)
+```
+
+```{r message = FALSE, warning = FALSE, fig.width = 5, fig.height = 4, echo = FALSE}
+#alkphos
+print("Alkaline Phosphatase - Marginal prognostic value")
+numcat_km(nums$alkphos)
+numcat_diff(nums$alkphos)
+```
+
+```{r message = FALSE, warning = FALSE, fig.width = 5, fig.height = 4, echo = FALSE}
+#sgot
+print("SGOT - Good prognostic value")
+numcat_km(nums$sgot)
+numcat_diff(nums$sgot)
+```
+
+```{r message = FALSE, warning = FALSE, fig.width = 5, fig.height = 4, echo = FALSE}
+#trig
+print("Triglycerides - Marginal prognostic value")
+numcat_km(nums$trig)
+numcat_diff(nums$trig)
+```
+
+```{r message = FALSE, warning = FALSE, fig.width = 5, fig.height = 4, echo = FALSE}
+#ptt
+print("PTT - Good prognostic value")
+numcat_km(nums$ptt)
+numcat_diff(nums$ptt)
+```
+
+
+#####**Parametric test - Cox Proportional Hazards Model**
+```{r, message = FALSE, warning = FALSE}
+#Cox Proportional Hzards model
+m2 <- coxph(Surv(time, event) ~ rx + sex + ascites +
+            hepmeg + spiders + edema +
+            lbili + lchol + lalkphos + lcu + lsgot +
+            lptt + ltrig + alb + plat + age_yr + stage, 
+            data = bcir1)
+m2
+```
+
+The Cox model confirms much of what we see in the non-parametric K-M models. There is no difference in survival between the treated and non-treated groups. Many of the tests and physical signs show significant associations. 
+
+#####**Conclusion**
+This study shows no difference in survival between the two treatment groups. However, we can see that the physical signs and laboratory tests associated with liver disease contribute well to the prognostic decision making process. The Cox Rsquared is 0.498 which indicates that 50% of the outcome is not explained by the model. However, I think we have very good non-parametric models that inform the decision process well. 
+
+```{r, message = FALSE, warning = FALSE}
+sessionInfo()
+```
 
 
 

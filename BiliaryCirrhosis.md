@@ -22,10 +22,10 @@ Missing data items are denoted by "." <br>
 
 Primary biliary cirrhosis (now more accurately termed primary biliary cholangitis) is a chronic disease in which the bile ducts in the liver are slowly destroyed. When the bile ducts are damaged, bile can back up in the liver and sometimes lead to irreversible scarring of liver tissue (cirrhosis). Primary biliary cholangitis is considered an autoimmune disease, which means your body's immune system is mistakenly attacking healthy cells and tissue. Researchers think a combination of genetic and environmental factors triggers the disease. It usually develops slowly. Medication can slow liver damage, especially if treatment begins early. <br>
 
-We will treat this data as a survival analysis problem. In addition to looking at the treatment's efficacy, we can look at the effectiveness of the various physical signs included as covariates which may help to indicate a fatal outcome for this disease. <br>
+We will treat this data as a survival analysis problem. In addition to looking at the treatment's efficacy, we can look at the effectiveness of the various physical signs and laboratory values included as covariates which may help to indicate prognosis for survival outcome. <br>
 
-I have stored the data on Google Sheets. It can be obtained by:
 
+First, load the necessary libraries:
 
 ```r
 set.seed(123)
@@ -40,49 +40,18 @@ library(broom)
 library(tidyr)
 library(flexsurv)
 library(GGally)
-library(e1071)
-library(rms)
 library(purrr)
 library(stringr)
 library(gridExtra)
 library(vcd)
-library(ggmosaic)
 ```
+
+I have stored the data on Google Sheets. It can be obtained by:
 
 ```r
 myurl <- "https://docs.google.com/spreadsheets/d/e/2PACX-1vTvuWL7vHEYFv9N0KV1C3ZVXDYhTMOS6n4PCjop8vaeK1IJQFsFTuh4bJYkdoYACZbc1upKeaykwqnK/pub?output=csv"
 
 bcir <- read_csv(url(myurl))
-```
-
-```
-## Warning: Duplicated column names deduplicated: '1' => '1_1' [4], '1' =>
-## '1_2' [6], '1' => '1_3' [7], '1' => '1_4' [8], '1' => '1_5' [9], '1' =>
-## '1_6' [10]
-```
-
-```
-## Parsed with column specification:
-## cols(
-##   .default = col_integer(),
-##   `1_6` = col_double(),
-##   `14.5` = col_double(),
-##   `261` = col_character(),
-##   `2.6` = col_double(),
-##   `156` = col_character(),
-##   `1718` = col_double(),
-##   `137.95` = col_double(),
-##   `172` = col_character(),
-##   `190` = col_character(),
-##   `12.2` = col_double()
-## )
-```
-
-```
-## See spec(...) for full column specifications.
-```
-
-```r
 colnames(bcir) <- c("id", "time", "event", "rx", "age",
                     "sex","ascites", "hepmeg", "spiders",
                     "edema", "bili", "chol", "alb", "cu",
@@ -201,7 +170,7 @@ nums1 <- nums %>% dplyr::select(lbili, lchol, lalkphos, lcu, lsgot,
                          lptt, ltrig, alb, plat, age_yr)
 ```
 
-I will deal with missing data by random imputation, Please see my previous blog posts for an explanation of this method: [Random Imputation]("https://epi2020datascience.blogspot.com/). We will need to obtain the means and standard deviations of the variable that we will impute.
+I will deal with missing data by random imputation, Please see my previous blog posts for an explanation of this method: [Random Imputation - January  2018]("https://epi2020datascience.blogspot.com/) and [Random vs MICE imputation - July 2018](https://epi2020datascience.blogspot.com/). We will need to obtain the means and standard deviations of the variables that we will impute.
 
 ```r
    #Random impute the NA's
@@ -285,6 +254,8 @@ GGally::ggpairs(nums1,
 ```
 
 ![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-12-1.png)<!-- -->
+
+None of the continuous variables are highly correlated. The higher correlations occur among the tests usually positive in chronic liver disease(alkaline phosphatase, copper and bilirubin)
 
 
 ```r
@@ -570,17 +541,27 @@ getsmd(unmatchedtab1)
 There really isn't much difference between the unmatched and matched groups so it looks as if the reseachers did the best possible job of matching through randomization of treatment. <br>
 
 
-
+#####**Kaplan-Meier Curves**
+Efficacy of treatment
 
 ```r
-#KM Curve
+#KM Curve - rx
 m1<- survfit(Surv(time, event) ~ rx, data = bcir1)
-m2<- survfit(Surv(time, event) ~ sex, data = bcir1)
-m3<- survfit(Surv(time, event) ~ stage, data = bcir1)
-m4<- survfit(Surv(time, event) ~ ascites, data = bcir1)
-m5<- survfit(Surv(time, event) ~ hepmeg, data = bcir1)
-m6<- survfit(Surv(time, event) ~ spiders, data = bcir1)
-m7<- survfit(Surv(time, event) ~ edema, data = bcir1)
+survdiff(Surv(time, event) ~ rx, data = bcir1)
+```
+
+```
+## Call:
+## survdiff(formula = Surv(time, event) ~ rx, data = bcir1)
+## 
+##        N Observed Expected (O-E)^2/E (O-E)^2/V
+## rx=0 157       64     62.7    0.0283    0.0572
+## rx=1 154       60     61.3    0.0289    0.0572
+## 
+##  Chisq= 0.1  on 1 degrees of freedom, p= 0.8
+```
+
+```r
 ggsurvplot(m1, data = bcir1,
            surv.median.line = "hv",
            conf.int = TRUE) # Add medians survival
@@ -588,55 +569,475 @@ ggsurvplot(m1, data = bcir1,
 
 ![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-20-1.png)<!-- -->
 
+There is no signicicant difference between the treatment curves. There isn't even a segment of the curves that shows any difference.
+
+Sex
+
+```r
+m2<- survfit(Surv(time, event) ~ sex, data = bcir1)
+survdiff(Surv(time, event) ~ sex, data = bcir1)
+```
+
+```
+## Call:
+## survdiff(formula = Surv(time, event) ~ sex, data = bcir1)
+## 
+##         N Observed Expected (O-E)^2/E (O-E)^2/V
+## sex=0  36       22     14.5     3.868      4.43
+## sex=1 275      102    109.5     0.513      4.43
+## 
+##  Chisq= 4.4  on 1 degrees of freedom, p= 0.04
+```
+
 ```r
 ggsurvplot(m2, data = bcir1,
            surv.median.line = "hv",
-           conf.int = TRUE) # Add medians survival
+           conf.int = TRUE) 
 ```
 
-![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-20-2.png)<!-- -->
+![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-21-1.png)<!-- -->
+
+There is no significant survival difference between men and women. The confidence intervals overlap along the whole length of the curves.
+
+Stage of Disease
+
+```r
+m3<- survfit(Surv(time, event) ~ stage, data = bcir1)
+survdiff(Surv(time, event) ~ stage, data = bcir1)
+```
+
+```
+## Call:
+## survdiff(formula = Surv(time, event) ~ stage, data = bcir1)
+## 
+##           N Observed Expected (O-E)^2/E (O-E)^2/V
+## stage=1  16        1     9.84      7.95      8.73
+## stage=2  67       16    32.08      8.06     10.96
+## stage=3 120       43    50.79      1.20      2.03
+## stage=4 108       64    31.28     34.23     46.49
+## 
+##  Chisq= 52.5  on 3 degrees of freedom, p= 2e-11
+```
 
 ```r
 ggsurvplot(m3, data = bcir1,
            surv.median.line = "hv",
-           conf.int = TRUE) # Add medians survival
+           conf.int = TRUE)
 ```
 
-![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-20-3.png)<!-- -->
+![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-22-1.png)<!-- -->
+
+The first three stages show similar, overlapping survival curves. Stage 4 patients showed a significantly worse survival.
+
+Ascites(fluid accumulation in peritoneal cavity)
+
+```r
+m4<- survfit(Surv(time, event) ~ ascites, data = bcir1)
+survdiff(Surv(time, event) ~ ascites, data = bcir1)
+```
+
+```
+## Call:
+## survdiff(formula = Surv(time, event) ~ ascites, data = bcir1)
+## 
+##             N Observed Expected (O-E)^2/E (O-E)^2/V
+## ascites=0 288      102   120.39      2.81      97.4
+## ascites=1  23       22     3.61     93.68      97.4
+## 
+##  Chisq= 97.4  on 1 degrees of freedom, p= <2e-16
+```
 
 ```r
 ggsurvplot(m4, data = bcir1,
            surv.median.line = "hv",
-           conf.int = TRUE) # Add medians survival
+           conf.int = TRUE)
 ```
 
-![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-20-4.png)<!-- -->
+![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-23-1.png)<!-- -->
+
+Those patients with ascites (fluid accumulation in the peritoneal cavity) showed a significantly worse survival. This indicates that the presence or absence of diabetes is a good indicator of survival prognosis.
+
+Hepatomegaly(enlarged liver)
+
+```r
+m5<- survfit(Surv(time, event) ~ hepmeg, data = bcir1)
+survdiff(Surv(time, event) ~ hepmeg, data = bcir1)
+```
+
+```
+## Call:
+## survdiff(formula = Surv(time, event) ~ hepmeg, data = bcir1)
+## 
+##            N Observed Expected (O-E)^2/E (O-E)^2/V
+## hepmeg=0 152       37     71.2      16.5      39.4
+## hepmeg=1 159       87     52.8      22.2      39.4
+## 
+##  Chisq= 39.4  on 1 degrees of freedom, p= 3e-10
+```
 
 ```r
 ggsurvplot(m5, data = bcir1,
            surv.median.line = "hv",
-           conf.int = TRUE) # Add medians survival
+           conf.int = TRUE) 
 ```
 
-![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-20-5.png)<!-- -->
+![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-24-1.png)<!-- -->
+
+Those patients with hepatomegaly (liver enlargement) sohow a significantly worse survival indicating that this physical sign is a good prognosticator of poor survival.
+
+Spiders(skin vascular malformations)
+
+```r
+m6<- survfit(Surv(time, event) ~ spiders, data = bcir1)
+survdiff(Surv(time, event) ~ spiders, data = bcir1)
+```
+
+```
+## Call:
+## survdiff(formula = Surv(time, event) ~ spiders, data = bcir1)
+## 
+##             N Observed Expected (O-E)^2/E (O-E)^2/V
+## spiders=0 222       73     97.4      6.12        29
+## spiders=1  89       51     26.6     22.44        29
+## 
+##  Chisq= 29  on 1 degrees of freedom, p= 7e-08
+```
 
 ```r
 ggsurvplot(m6, data = bcir1,
            surv.median.line = "hv",
-           conf.int = TRUE) # Add medians survival
+           conf.int = TRUE)
 ```
 
-![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-20-6.png)<!-- -->
+![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-25-1.png)<!-- -->
+
+Likewise, spiders (skin vascular structures that have the appearance of spiders are a good predictor of poor survival.
+
+Edema(fluid swelling in the legs)
+
+```r
+m7<- survfit(Surv(time, event) ~ edema, data = bcir1)
+survdiff(Surv(time, event) ~ edema, data = bcir1)
+```
+
+```
+## Call:
+## survdiff(formula = Surv(time, event) ~ edema, data = bcir1)
+## 
+##           N Observed Expected (O-E)^2/E (O-E)^2/V
+## edema=0 292      106   121.68      2.02       109
+## edema=1  19       18     2.32    105.92       109
+## 
+##  Chisq= 109  on 1 degrees of freedom, p= <2e-16
+```
 
 ```r
 ggsurvplot(m7, data = bcir1,
            surv.median.line = "hv",
-           conf.int = TRUE) # Add medians survival
+           conf.int = TRUE) 
 ```
 
-![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-20-7.png)<!-- -->
+![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-26-1.png)<!-- -->
+
+Edema (fluid swelling in the legs) is also a reliable sign of poor survival, shown by the significant difference in survival curves between the groups having and not having spider skin vessels. <br>
 
 
+#####**Evaluation of Laboratory Test Prognostic Value**
+The two functions below will categorize the lab tests at the 50th percentile and look for significant differences in survival between the two groups. These comparisons will indicate the prognostic value of the lab tests in primary biliary cirrhosis.
+
+```r
+#Categorize the numerics for K-M estimator
+   #bili - not the log value
+numcat_km <- function(var) {
+  var_cut <- cut(var,
+                 quantile(var, c( 0.00, 0.50, 1.00),
+                          na.rm = TRUE))
+  bcir1$var_cut <- var_cut
+  m8<- survfit(Surv(time, event) ~ var_cut, data = bcir1)
+  ggsurvplot(m8, data = bcir1,
+             surv.median.line = "hv",
+             conf.int = TRUE)
+}
+```
+
+
+```r
+numcat_diff <- function(var) {
+  var_cut <- cut(var,
+                 quantile(var, c( 0.00, 0.50, 1.00),
+                          na.rm = TRUE))
+  bcir1$var_cut <- var_cut
+  survdiff(Surv(time, event) ~ var_cut, data = bcir1)
+}
+```
+
+
+```
+## [1] "Bilirubin - Good prognostic value"
+```
+
+![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-29-1.png)<!-- -->
+
+```
+## Call:
+## survdiff(formula = Surv(time, event) ~ var_cut, data = bcir1)
+## 
+## n=308, 3 observations deleted due to missingness.
+## 
+##                     N Observed Expected (O-E)^2/E (O-E)^2/V
+## var_cut=(0.3,1.3] 153       26     75.3      32.3      86.8
+## var_cut=(1.3,28]  155       96     46.7      52.0      86.8
+## 
+##  Chisq= 86.8  on 1 degrees of freedom, p= <2e-16
+```
+
+
+```
+## [1] "Cholesterol - Poor prognostic value"
+```
+
+![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-30-1.png)<!-- -->
+
+```
+## Call:
+## survdiff(formula = Surv(time, event) ~ var_cut, data = bcir1)
+## 
+## n=282, 29 observations deleted due to missingness.
+## 
+##                          N Observed Expected (O-E)^2/E (O-E)^2/V
+## var_cut=(120,310]      142       48     62.7      3.45      7.89
+## var_cut=(310,1.78e+03] 140       65     50.3      4.29      7.89
+## 
+##  Chisq= 7.9  on 1 degrees of freedom, p= 0.005
+```
+
+
+```
+## [1] "Albumin - Good prognostic value"
+```
+
+![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-31-1.png)<!-- -->
+
+```
+## Call:
+## survdiff(formula = Surv(time, event) ~ var_cut, data = bcir1)
+## 
+## n=310, 1 observation deleted due to missingness.
+## 
+##                       N Observed Expected (O-E)^2/E (O-E)^2/V
+## var_cut=(1.96,3.55] 155       83     48.1      25.3      42.8
+## var_cut=(3.55,4.64] 155       40     74.9      16.2      42.8
+## 
+##  Chisq= 42.8  on 1 degrees of freedom, p= 6e-11
+```
+
+
+```
+## [1] "Copper - Good prognostic value"
+```
+
+![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-32-1.png)<!-- -->
+
+```
+## Call:
+## survdiff(formula = Surv(time, event) ~ var_cut, data = bcir1)
+## 
+## n=308, 3 observations deleted due to missingness.
+## 
+##                    N Observed Expected (O-E)^2/E (O-E)^2/V
+## var_cut=(4,73]   157       36     73.2      18.9      47.4
+## var_cut=(73,588] 151       87     49.8      27.9      47.4
+## 
+##  Chisq= 47.4  on 1 degrees of freedom, p= 6e-12
+```
+
+
+```
+## [1] "Alkaline Phosphatase - Marginal prognostic value"
+```
+
+![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-33-1.png)<!-- -->
+
+```
+## Call:
+## survdiff(formula = Surv(time, event) ~ var_cut, data = bcir1)
+## 
+## n=310, 1 observation deleted due to missingness.
+## 
+##                               N Observed Expected (O-E)^2/E (O-E)^2/V
+## var_cut=(289,1.26e+03]      155       46     61.4      3.88       7.8
+## var_cut=(1.26e+03,1.39e+04] 155       78     62.6      3.81       7.8
+## 
+##  Chisq= 7.8  on 1 degrees of freedom, p= 0.005
+```
+
+
+```
+## [1] "SGOT - Good prognostic value"
+```
+
+![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-34-1.png)<!-- -->
+
+```
+## Call:
+## survdiff(formula = Surv(time, event) ~ var_cut, data = bcir1)
+## 
+## n=310, 1 observation deleted due to missingness.
+## 
+##                      N Observed Expected (O-E)^2/E (O-E)^2/V
+## var_cut=(26.4,115] 156       42     71.9      12.4        30
+## var_cut=(115,457]  154       82     52.1      17.2        30
+## 
+##  Chisq= 30  on 1 degrees of freedom, p= 4e-08
+```
+
+
+```
+## [1] "Triglycerides - Marginal prognostic value"
+```
+
+![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-35-1.png)<!-- -->
+
+```
+## Call:
+## survdiff(formula = Surv(time, event) ~ var_cut, data = bcir1)
+## 
+## n=280, 31 observations deleted due to missingness.
+## 
+##                     N Observed Expected (O-E)^2/E (O-E)^2/V
+## var_cut=(33,108]  141       47     62.6      3.88       8.9
+## var_cut=(108,598] 139       65     49.4      4.91       8.9
+## 
+##  Chisq= 8.9  on 1 degrees of freedom, p= 0.003
+```
+
+
+```
+## [1] "PTT - Good prognostic value"
+```
+
+![](BiliaryCirrhosis_files/figure-html/unnamed-chunk-36-1.png)<!-- -->
+
+```
+## Call:
+## survdiff(formula = Surv(time, event) ~ var_cut, data = bcir1)
+## 
+## n=310, 1 observation deleted due to missingness.
+## 
+##                       N Observed Expected (O-E)^2/E (O-E)^2/V
+## var_cut=(9,10.6]    173       40     73.9      15.5      38.9
+## var_cut=(10.6,17.1] 137       84     50.1      22.9      38.9
+## 
+##  Chisq= 38.9  on 1 degrees of freedom, p= 4e-10
+```
+
+
+#####**Parametric test - Cox Proportional Hazards Model**
+
+```r
+#Cox Proportional Hzards model
+m2 <- coxph(Surv(time, event) ~ rx + sex + ascites +
+            hepmeg + spiders + edema +
+            lbili + lchol + lalkphos + lcu + lsgot +
+            lptt + ltrig + alb + plat + age_yr + stage, 
+            data = bcir1)
+m2
+```
+
+```
+## Call:
+## coxph(formula = Surv(time, event) ~ rx + sex + ascites + hepmeg + 
+##     spiders + edema + lbili + lchol + lalkphos + lcu + lsgot + 
+##     lptt + ltrig + alb + plat + age_yr + stage, data = bcir1)
+## 
+##               coef exp(coef)  se(coef)     z       p
+## rx       -2.80e-02  9.72e-01  1.98e-01 -0.14 0.88775
+## sex      -1.94e-02  9.81e-01  2.92e-01 -0.07 0.94697
+## ascites   2.86e-01  1.33e+00  3.26e-01  0.88 0.38072
+## hepmeg    1.31e-01  1.14e+00  2.41e-01  0.54 0.58851
+## spiders  -6.03e-02  9.41e-01  2.29e-01 -0.26 0.79203
+## edema     8.82e-01  2.42e+00  3.41e-01  2.58 0.00976
+## lbili     6.12e-01  1.84e+00  1.67e-01  3.68 0.00024
+## lchol     1.23e-01  1.13e+00  2.64e-01  0.47 0.64070
+## lalkphos -6.01e-02  9.42e-01  1.39e-01 -0.43 0.66568
+## lcu       2.81e-01  1.33e+00  1.59e-01  1.77 0.07753
+## lsgot     4.74e-01  1.61e+00  2.78e-01  1.70 0.08871
+## lptt      3.31e+00  2.73e+01  1.22e+00  2.72 0.00652
+## ltrig    -2.67e-03  9.97e-01  2.31e-01 -0.01 0.99081
+## alb      -6.97e-01  4.98e-01  2.68e-01 -2.60 0.00931
+## plat     -7.49e-05  1.00e+00  1.15e-03 -0.06 0.94821
+## age_yr    3.10e-02  1.03e+00  1.03e-02  2.99 0.00274
+## stage     2.68e-01  1.31e+00  1.54e-01  1.74 0.08234
+## 
+## Likelihood ratio test=212  on 17 df, p=<2e-16
+## n= 311, number of events= 124
+```
+
+The Cox model confirms much of what we see in the non-parametric K-M models. There is no difference in survival between the treated and non-treated groups. Many of the tests and physical signs show significant associations. 
+
+#####**Conclusion**
+This study shows no difference in survival between the two treatment groups. However, we can see that the physical signs and laboratory tests associated with liver disease contribute well to the prognostic decision making process. The Cox Rsquared is 0.498 which indicates that 50% of the outcome is not explained by the model. However, I think we have very good non-parametric models that inform the decision process well. 
+
+
+```r
+sessionInfo()
+```
+
+```
+## R version 3.5.1 (2018-07-02)
+## Platform: x86_64-w64-mingw32/x64 (64-bit)
+## Running under: Windows 10 x64 (build 17134)
+## 
+## Matrix products: default
+## 
+## locale:
+## [1] LC_COLLATE=English_United States.1252 
+## [2] LC_CTYPE=English_United States.1252   
+## [3] LC_MONETARY=English_United States.1252
+## [4] LC_NUMERIC=C                          
+## [5] LC_TIME=English_United States.1252    
+## 
+## attached base packages:
+## [1] grid      stats     graphics  grDevices utils     datasets  methods  
+## [8] base     
+## 
+## other attached packages:
+##  [1] bindrcpp_0.2.2     vcd_1.4-4          gridExtra_2.3     
+##  [4] GGally_1.4.0       flexsurv_1.1       broom_0.5.0       
+##  [7] survcomp_1.30.0    prodlim_2018.04.18 survMisc_0.5.5    
+## [10] survminer_0.4.3    ggpubr_0.1.7       magrittr_1.5      
+## [13] Matching_4.9-3     MASS_7.3-50        tableone_0.9.3    
+## [16] survival_2.42-6    forcats_0.3.0      stringr_1.3.1     
+## [19] dplyr_0.7.6        purrr_0.2.5        readr_1.1.1       
+## [22] tidyr_0.8.1        tibble_1.4.2       ggplot2_3.0.0     
+## [25] tidyverse_1.2.1   
+## 
+## loaded via a namespace (and not attached):
+##  [1] nlme_3.1-137       survivalROC_1.0.3  cmprsk_2.2-7      
+##  [4] lubridate_1.7.4    RColorBrewer_1.1-2 httr_1.3.1        
+##  [7] rprojroot_1.3-2    tools_3.5.1        backports_1.1.2   
+## [10] utf8_1.1.4         R6_2.2.2           KernSmooth_2.23-15
+## [13] lazyeval_0.2.1     colorspace_1.3-2   rmeta_3.0         
+## [16] withr_2.1.2        tidyselect_0.2.4   compiler_3.5.1    
+## [19] cli_1.0.0          rvest_0.3.2        xml2_1.2.0        
+## [22] labeling_0.3       scales_1.0.0       lmtest_0.9-36     
+## [25] mvtnorm_1.0-8      quadprog_1.5-5     digest_0.6.16     
+## [28] rmarkdown_1.10     pkgconfig_2.0.2    htmltools_0.3.6   
+## [31] labelled_1.1.0     rlang_0.2.2        readxl_1.1.0      
+## [34] rstudioapi_0.7     SuppDists_1.1-9.4  bindr_0.1.1       
+## [37] zoo_1.8-3          jsonlite_1.5       Matrix_1.2-14     
+## [40] Rcpp_0.12.18       munsell_0.5.0      fansi_0.3.0       
+## [43] stringi_1.1.7      yaml_2.2.0         mstate_0.2.11     
+## [46] plyr_1.8.4         crayon_1.3.4       lattice_0.20-35   
+## [49] haven_1.1.2        splines_3.5.1      hms_0.4.2         
+## [52] knitr_1.20         pillar_1.3.0       reshape2_1.4.3    
+## [55] glue_1.3.0         evaluate_0.11      data.table_1.11.4 
+## [58] modelr_0.1.2       deSolve_1.21       cellranger_1.1.0  
+## [61] bootstrap_2017.2   gtable_0.2.0       muhaz_1.2.6       
+## [64] reshape_0.8.7      km.ci_0.5-2        assertthat_0.2.0  
+## [67] xtable_1.8-2       survey_3.33-2      e1071_1.7-0       
+## [70] class_7.3-14       KMsurv_0.1-5       lava_1.6.3
+```
 
 
 
